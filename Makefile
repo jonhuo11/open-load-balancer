@@ -18,7 +18,7 @@ OBJS = $(patsubst $(SRC_DIR)/%.cc,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS = $(OBJS:.o=.d)
 
 # Executable name (use the directory name or a custom name)
-EXEC = $(BUILD_DIR)/myapp
+EXEC = $(BUILD_DIR)/openloadbalancer
 
 # Default target
 all: $(EXEC)
