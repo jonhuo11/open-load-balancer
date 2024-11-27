@@ -50,6 +50,10 @@ size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestination
         clientServiceMap[p.sender] = (round_i++) % lb.services.size();
         destServiceIter = clientServiceMap.find(p.sender);
     }
+    cout << "map" << endl;
+    for (const auto &pair : clientServiceMap) {
+        std::cout << pair.first << ": " << pair.second << std::endl;
+    }
 
     // grab the client
     size_t destServiceIndex = destServiceIter->second;
@@ -81,8 +85,8 @@ void LoadBalancerUDP::main() {
         for (int i = 0; i < nfds; ++i) {
             if (events[i].events && EPOLLIN) {  // Data is available to read
                 ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
-                packet.sender.port = clientAddr.sin_addr.s_addr;  // TODO: can we directly copy into this field for speed?
-                packet.sender.ip = clientAddr.sin_port;
+                packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
+                packet.sender.ip = clientAddr.sin_addr.s_addr;
 
                 if (nBytesRead < 0) {
                     cerr << "recvfrom server socket failed" << endl;
@@ -93,5 +97,5 @@ void LoadBalancerUDP::main() {
             }
         }
     }
-    cout << "Exiting." << endl;
+    cout << "Exiting." << endl;  // TODO: epoll_wait throws runtime error on keyboard interrupt exit, fix this
 }
