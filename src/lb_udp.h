@@ -82,7 +82,7 @@ class LoadBalancerUDP {
     // keep track of which clients are mapped to which services
     class RoundRobinServiceAssignmentBalance : public BalanceStrategy {
         size_t round_i = 0;  // which is the next server to assign to
-        unordered_map<ClientIdentifier, size_t> clientServiceMap;
+        unordered_map<ClientIdentifier, size_t> clientServiceMap; // TODO: if a service goes down, the mappings need to be updated
 
        public:
         size_t calculateDestinationServiceForPacket(Packet& p) override;
