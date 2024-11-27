@@ -40,6 +40,8 @@ size_t LoadBalancerUDP::RandomBalance::calculateDestinationServiceForPacket(Pack
     return destServiceIndex;
 }
 
+LoadBalancerUDP::RoundRobinServiceAssignmentBalance::RoundRobinServiceAssignmentBalance(LoadBalancerUDP &lb) : BalanceStrategy(lb) {}
+
 size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestinationServiceForPacket(PacketUDP &p) {
     // is it a new client?
     auto destServiceIter = clientServiceMap.find(p.sender);

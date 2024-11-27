@@ -1,0 +1,17 @@
+# Load Balancer Configuration Example
+
+# Listening Port (the port the load balancer will listen on)
+8080
+
+# Load Balance Mode
+# 0 = Round Robin
+# 1 = IP Hashing
+0
+
+# Number of Service Ports (how many backend servers you want to distribute traffic to)
+3
+
+# List of Service Ports (the ports of your backend servers)
+9001
+9002
+9003

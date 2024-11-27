@@ -50,6 +50,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
         unordered_map<ClientIdentifier, size_t> clientServiceMap;  // TODO: if a service goes down, the mappings need to be updated
 
        public:
+        RoundRobinServiceAssignmentBalance(LoadBalancerUDP& lb);
         size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
     };
 
