@@ -1,8 +1,9 @@
-#include <iostream>
-#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <unistd.h>
+
 #include <cstring>
+#include <iostream>
 
 using namespace std;
 
@@ -12,13 +13,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     string id;
-    uint16_t port; // destination port
+    uint16_t port;  // destination port
     int message_count;
     try {
         id = argv[1];
         port = std::stoi(argv[2]);
         message_count = std::stoi(argv[3]);
-    } catch (...) {return 1;}
+    } catch (...) {
+        return 1;
+    }
 
     int udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_socket < 0) {
@@ -28,9 +31,9 @@ int main(int argc, char* argv[]) {
 
     struct sockaddr_in dest_addr;
     memset(&dest_addr, 0, sizeof(dest_addr));
-    dest_addr.sin_family = AF_INET;                       // IPv4
-    dest_addr.sin_port = htons(port);                     // Port number
-    dest_addr.sin_addr.s_addr = inet_addr("127.0.0.1");   // Localhost IP address
+    dest_addr.sin_family = AF_INET;                      // IPv4
+    dest_addr.sin_port = htons(port);                    // Port number
+    dest_addr.sin_addr.s_addr = inet_addr("127.0.0.1");  // Localhost IP address
 
     string message = "Hello from generator " + id;
     const char* sendable_message = message.c_str();
