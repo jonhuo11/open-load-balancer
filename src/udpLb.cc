@@ -5,7 +5,7 @@ void handleSignal(int sig) {
     stop = true;
 }
 
-LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services, unsigned int balanceStrategyChoice) : socket(), cfg(cfg), services(services) {
+LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services) : socket(), cfg(cfg), services(services) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;                      // IPv4
@@ -21,7 +21,7 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
     }
 
     // pick strategy
-    switch (balanceStrategyChoice) {
+    switch (cfg.mode) {
         case 0:  // random
             balanceStrategy = make_unique<RandomBalance>(*this);
             break;

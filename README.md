@@ -13,3 +13,13 @@ A load balancer written in C++ to learn more about networking, Linux sockets, an
 8) Learn about ways to improve performance and implement them, perhaps by studying NGINX
 9) Learn how to use pthreads and see if this can be implemented
 10) More algorithms and configuration settings
+
+# Demo
+
+There is demo code in `demopy`. Install requirements with `pip` and run using Python 3.
+
+`traffic_gen.py` generates UDP packets and changes the IP header to be randomly selected from a provided list of IPs to simulate many outside clients making requests on the load balancer. This script uses `scapy` and requires root access to run.
+
+`service.py` listens to UDP traffic on a list of ports and simulates the services that the load balancer is distributing work across.
+
+Run the load balancer and set the service ports to the ports that `service.py` is listening on.

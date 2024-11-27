@@ -27,8 +27,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // 0 is round robin
-    // 1 is IP hashing
+    // 0 is random
+    // 1 is IP hashing with round robin
     if (!(configFile >> config.mode)) {
         cerr << "Could not read load balance mode" << endl;
         return 1;
@@ -59,5 +59,7 @@ int main(int argc, char *argv[]) {
         cout << "Opened client socket at " << config.servicePorts[i] << endl;
     }
 
-    return 0;
+    // start load balancer
+    LoadBalancerUDP lb(config, services);
+    lb.main();
 }

@@ -19,7 +19,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     const vector<unique_ptr<ServiceSocketUDP>>& services;
 
    public:
-    explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services, unsigned int balanceStrategyChoice);
+    explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services);
     void main();
 
    private:

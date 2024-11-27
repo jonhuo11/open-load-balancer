@@ -4,8 +4,8 @@
 8080
 
 # Load Balance Mode
-# 0 = Round Robin
-# 1 = IP Hashing
+# 0 = Random
+# 1 = IP Hashing Round Robin
 0
 
 # Number of Service Ports (how many backend servers you want to distribute traffic to)
