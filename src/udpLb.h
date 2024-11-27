@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <csignal>
 #include <iostream>
 #include <random>
 #include <unordered_map>
@@ -17,7 +19,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     const vector<unique_ptr<ServiceSocketUDP>>& services;
 
    public:
-    LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services, unsigned int balanceStrategy);
+    explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services, unsigned int balanceStrategyChoice);
     void main();
 
    private:
@@ -27,7 +29,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
 
        public:
         BalanceStrategy(LoadBalancerUDP& lb) : lb(lb) {};
-        virtual size_t calculateDestinationServiceForPacket(Packet& p) = 0;  // returns the index of the service socket to send packet to
+        virtual size_t calculateDestinationServiceForPacket(PacketUDP& p) = 0;  // returns the index of the service socket to send packet to
         virtual ~BalanceStrategy() = default;
     };
 
@@ -39,7 +41,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
 
        public:
         RandomBalance(LoadBalancerUDP& lb);
-        size_t calculateDestinationServiceForPacket(Packet& p) override;
+        size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
     };
 
     // keep track of which clients are mapped to which services
@@ -48,7 +50,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
         unordered_map<ClientIdentifier, size_t> clientServiceMap;  // TODO: if a service goes down, the mappings need to be updated
 
        public:
-        size_t calculateDestinationServiceForPacket(Packet& p) override;
+        size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
     };
 
     unique_ptr<BalanceStrategy> balanceStrategy;

@@ -7,17 +7,16 @@
 
 #include <cstring>
 #include <memory>
+#include <stdexcept>
 
 #include "util.h"
 
 using namespace std;
 
-class SocketUDP : private NonCopyableNonMovable {
-    int socket;
-
+// listening socket, cannot bind
+class SocketUDP : private FileDescriptor {
    public:
-    SocketUDP();
-    ~SocketUDP();
+    explicit SocketUDP();
     int getSocket() const;
 
     // TODO: enable move semantics
@@ -27,20 +26,18 @@ class SocketUDP : private NonCopyableNonMovable {
 };
 
 // services that the load balancer is distributing traffic across
-class ServiceSocketUDP : private NonCopyableNonMovable {
-    SocketUDP socket;
+class ServiceSocketUDP : public SocketUDP {
     struct sockaddr_in destAddr;
 
    public:
-    ServiceSocketUDP(const char* ip, uint16_t port);
+    explicit ServiceSocketUDP(const char* ip, uint16_t port);
     ~ServiceSocketUDP();
     int send(const char* message);
 };
 
-// socket that server reads incoming udp traffic from services
-// can be bound
-class ServerSocketUDP : private NonCopyableNonMovable {
-    SocketUDP socket;
+// socket that server reads incoming udp traffic from services, can be binded
+class ServerSocketUDP : public SocketUDP {
+    bool binded = false;
 
    public:
     void bind(const sockaddr* addr, const socklen_t len);  // attempts to bind to port based on settings in sockaddr
@@ -55,16 +52,21 @@ struct ClientIdentifier {
     };
 };
 
+namespace std {
 template <>
 struct hash<ClientIdentifier> {
     size_t operator()(const ClientIdentifier& client) const {
         return std::hash<uint32_t>()(client.ip) ^ std::hash<uint16_t>()(client.port);
     }
 };
+}  // namespace std
 
 // incoming packet read from server socket
-struct Packet {
-    ClientIdentifier sender;
+struct PacketUDP {
+    static const uint32_t BUFFER_SIZE = 65535;
 
-    // TODO: what goes here?
+    ClientIdentifier sender;
+    char data[BUFFER_SIZE];
+
+    explicit PacketUDP();
 };

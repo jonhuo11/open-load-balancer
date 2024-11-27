@@ -1,6 +1,11 @@
 #include "udpLb.h"
 
-LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services, unsigned int balanceStrategy) : socket(), cfg(cfg), services(services) {
+atomic<bool> stop;
+void handleSignal(int sig) {
+    stop = true;
+}
+
+LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services, unsigned int balanceStrategyChoice) : socket(), cfg(cfg), services(services) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;                      // IPv4
@@ -9,20 +14,33 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
 
     try {
         socket.bind((struct sockaddr *)&serverAddr, sizeof(serverAddr));
-    } catch (exception &) {
+    } catch (runtime_error &) {
         // TODO: invalidate the lb
+        cerr << "The load balancer could not bind to the socket on port " << cfg.listenPort << endl;
+        throw;
+    }
+
+    // pick strategy
+    switch (balanceStrategyChoice) {
+        case 0:  // random
+            balanceStrategy = make_unique<RandomBalance>(*this);
+            break;
+        case 1:  // rr
+            balanceStrategy = make_unique<RoundRobinServiceAssignmentBalance>(*this);
+            break;
+        default:
+            balanceStrategy = make_unique<RandomBalance>(*this);
     }
 }
 
 LoadBalancerUDP::RandomBalance::RandomBalance(LoadBalancerUDP &lb) : BalanceStrategy(lb), gen(rdev()), distr(0, lb.services.size() - 1) {}
 
-size_t LoadBalancerUDP::RandomBalance::calculateDestinationServiceForPacket(Packet &p) {
+size_t LoadBalancerUDP::RandomBalance::calculateDestinationServiceForPacket(PacketUDP &p) {
     size_t destServiceIndex = (size_t)distr(gen);
-    // TODO: send the packet data to that client
-    return 0;
+    return destServiceIndex;
 }
 
-size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestinationServiceForPacket(Packet &p) {
+size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestinationServiceForPacket(PacketUDP &p) {
     // is it a new client?
     auto destServiceIter = clientServiceMap.find(p.sender);
     if (destServiceIter == clientServiceMap.end()) {
@@ -33,55 +51,45 @@ size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestination
 
     // grab the client
     size_t destServiceIndex = destServiceIter->second;
-
-    // TODO: send the packet data to that client
-    return 0;
+    return destServiceIndex;
 }
 
 void LoadBalancerUDP::main() {
-    int epollFd = epoll_create1(0);
-    if (epollFd == -1) throw exception();
+    signal(SIGINT, handleSignal);
+    FileDescriptor epoll(epoll_create1(0));
 
-    struct epoll_event event, events[MAX_EVENTS];
-    struct sockaddr_in clientAddr;
+    const size_t MAX_EVENTS = 128;
+    struct epoll_event event, events[MAX_EVENTS];  // 128 epoll events batched at a time
+
+    PacketUDP packet = PacketUDP();  // used for reading in data
+    struct sockaddr_in clientAddr;   // used for reading client ip/port
     socklen_t clientLen = sizeof(clientAddr);
-    char buffer[BUFFER_SIZE];
 
     event.events = EPOLLIN;
-    event.data.fd = socket;
-    if (epoll_ctl(epollFd, EPOLL_CTL_ADD, udpSocket, &event) == -1) {
-        cerr << "epoll_ctl: udp_socket" << endl;
-        close(udpSocket);
-        close(epollFd);
-        return 1;
-    }
+    event.data.fd = socket.getSocket();
+    if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, socket.getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
 
-    int sendClient = 0;
-    for (;;) {
-        int nfds = epoll_wait(epollFd, events, MAX_EVENTS, -1);  // number of events
-        if (nfds == -1) {
-            cerr << "epoll_wait failed" << endl;
-            close(udpSocket);
-            close(epollFd);
-            return 1;
+    while (!stop) {
+        int nfds = epoll_wait(epoll.getFd(), events, MAX_EVENTS, -1);  // number of events
+        if (nfds < 0) {
+            throw runtime_error("epoll_wait failed");
         }
 
         // does not execute if nfds < 1
         for (int i = 0; i < nfds; ++i) {
             if (events[i].events && EPOLLIN) {  // Data is available to read
-                memset(buffer, 0, BUFFER_SIZE);
-                ssize_t n = recvfrom(udpSocket, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
-                if (n < 0) {
-                    cerr << "recv failed" << endl;
-                } else {
-                    // TODO: migrate into lb.cc
-                    if (sendClient >= services.size()) {
-                        sendClient = 0;
-                    }  // simple round robin schedule
-                    services[sendClient]->send(buffer);
-                    sendClient++;
+                ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
+                packet.sender.port = clientAddr.sin_addr.s_addr;  // TODO: can we directly copy into this field for speed?
+                packet.sender.ip = clientAddr.sin_port;
+
+                if (nBytesRead < 0) {
+                    cerr << "recvfrom server socket failed" << endl;
+                    continue;
                 }
+                size_t destServiceIndex = balanceStrategy->calculateDestinationServiceForPacket(packet);
+                services[destServiceIndex]->send(packet.data);
             }
         }
     }
+    cout << "Exiting." << endl;
 }
