@@ -4,7 +4,7 @@ SocketUDP::SocketUDP() : FileDescriptor(::socket(AF_INET, SOCK_DGRAM, 0)) {}
 
 int SocketUDP::getSocket() const { return getFd(); }
 
-ServiceSocketUDP::ServiceSocketUDP(const char *ip, uint16_t port) : SocketUDP() {
+ServiceSocketUDP::ServiceSocketUDP(const char* ip, uint16_t port) : SocketUDP() {
     memset(&destAddr, 0, sizeof(destAddr));    // clear struct fields to 0
     destAddr.sin_family = AF_INET;             // IPv4
     destAddr.sin_port = htons(port);           // Port number
@@ -13,14 +13,26 @@ ServiceSocketUDP::ServiceSocketUDP(const char *ip, uint16_t port) : SocketUDP() 
 
 ServiceSocketUDP::~ServiceSocketUDP() {}
 
-int ServiceSocketUDP::send(const char *message) {
-    return sendto(getSocket(), message, strlen(message), 0, (struct sockaddr *)&destAddr, sizeof(destAddr));
+int ServiceSocketUDP::send(const char* message) {
+    return sendto(getSocket(), message, strlen(message), 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
 }
 
-void ServerSocketUDP::bind(const sockaddr *addr, const socklen_t len) {
+void ServerSocketUDP::bind(const sockaddr* addr, const socklen_t len) {
     if (::bind(getSocket(), addr, len) >= 0) binded = true;
 
     if (!binded) throw runtime_error("Could not bind server socket to port");
 }
 
 PacketUDP::PacketUDP() { memset(data, 0, BUFFER_SIZE); }
+
+ostream& operator<<(ostream& os, const ClientIdentifier& client) {
+    // Convert IP from binary to dotted-decimal notation
+    struct in_addr addr;
+    addr.s_addr = client.ip;
+    char* ipStr = inet_ntoa(addr);
+
+    // Print IP address and port
+    os << ipStr << ":" << client.port;
+
+    return os;
+}

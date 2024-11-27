@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <cstring>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 
@@ -52,11 +53,13 @@ struct ClientIdentifier {
     };
 };
 
+ostream& operator<<(ostream& os, const ClientIdentifier& client);
+
 namespace std {
 template <>
 struct hash<ClientIdentifier> {
     size_t operator()(const ClientIdentifier& client) const {
-        return std::hash<uint32_t>()(client.ip) ^ std::hash<uint16_t>()(client.port);
+        return hash<uint32_t>()(client.ip) ^ hash<uint16_t>()(client.port);
     }
 };
 }  // namespace std
