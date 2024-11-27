@@ -2,3 +2,4 @@ build/
 demo/*.out
 config.txt
 .vscode/
+.venv/
