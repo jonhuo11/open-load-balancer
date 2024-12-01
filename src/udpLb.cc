@@ -1,10 +1,5 @@
 #include "udpLb.h"
 
-atomic<bool> stop;
-void handleSignal(int sig) {
-    stop = true;
-}
-
 LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services) : socket(), cfg(cfg), services(services) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
@@ -31,6 +26,10 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
         default:
             balanceStrategy = make_unique<RandomBalance>(*this);
     }
+}
+
+LoadBalancerUDP::~LoadBalancerUDP() {
+    cout << "\nShut down successfully" << endl;
 }
 
 LoadBalancerUDP::RandomBalance::RandomBalance(LoadBalancerUDP &lb) : BalanceStrategy(lb), gen(rdev()), distr(0, lb.services.size() - 1) {}
@@ -60,42 +59,63 @@ size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestination
     return destServiceIndex;
 }
 
-void LoadBalancerUDP::main() {
-    signal(SIGINT, handleSignal);
-    FileDescriptor epoll(epoll_create1(0));
+void LoadBalancerUDP::main(promise<void>& exceptionPromise) {
+    try {
+        FileDescriptor epoll(epoll_create1(0));
 
-    const size_t MAX_EVENTS = 128;
-    struct epoll_event event, events[MAX_EVENTS];  // 128 epoll events batched at a time
+        const size_t MAX_EVENTS = 128;
+        struct epoll_event event, events[MAX_EVENTS];  // 128 epoll events batched at a time
+        int epollTimeout = 0; // NOTE: -1 will BLOCK the thread!!!
 
-    PacketUDP packet = PacketUDP();  // used for reading in data
-    struct sockaddr_in clientAddr;   // used for reading client ip/port
-    socklen_t clientLen = sizeof(clientAddr);
+        PacketUDP packet = PacketUDP();  // used for reading in data
+        struct sockaddr_in clientAddr;   // used for reading client ip/port
+        socklen_t clientLen = sizeof(clientAddr);
 
-    event.events = EPOLLIN;
-    event.data.fd = socket.getSocket();
-    if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, socket.getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
+        event.events = EPOLLIN;
+        event.data.fd = socket.getSocket();
+        if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, socket.getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
 
-    while (!stop) {
-        int nfds = epoll_wait(epoll.getFd(), events, MAX_EVENTS, -1);  // number of events
-        if (nfds < 0) {
-            throw runtime_error("epoll_wait failed");
-        }
+        running = true;
+        while (running) {
+            int nfds = epoll_wait(epoll.getFd(), events, MAX_EVENTS, epollTimeout);
+            if (nfds < 0) {
+                throw runtime_error("epoll_wait failed");
+            }
 
-        // does not execute if nfds < 1
-        for (int i = 0; i < nfds; ++i) {
-            if (events[i].events && EPOLLIN) {  // Data is available to read
-                ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
-                packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
-                packet.sender.ip = clientAddr.sin_addr.s_addr;
+            // does not execute if nfds < 1
+            for (int i = 0; i < nfds; ++i) {
+                if (events[i].events && EPOLLIN) {  // Data is available to read
+                    ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
+                    packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
+                    packet.sender.ip = clientAddr.sin_addr.s_addr;
 
-                if (nBytesRead < 0) {
-                    cerr << "recvfrom server socket failed" << endl;
-                    continue;
+                    if (nBytesRead < 0) { // TODO: write some error somehow?
+                        continue;
+                    }
+                    size_t destServiceIndex = balanceStrategy->calculateDestinationServiceForPacket(packet);
+                    services[destServiceIndex]->send(packet.data);
                 }
-                size_t destServiceIndex = balanceStrategy->calculateDestinationServiceForPacket(packet);
-                services[destServiceIndex]->send(packet.data);
             }
         }
+    } catch (const exception& e) {
+        exceptionPromise.set_exception(make_exception_ptr(e));
+        return;
     }
-    cout << "Exiting." << endl;  // TODO: epoll_wait throws runtime error on keyboard interrupt exit, fix this
+    exceptionPromise.set_value();
+}
+
+void LoadBalancerUDP::stop() {
+    running = false;
+}
+
+void LoadBalancerUDP::start() {
+    promise<void> prom;
+    future<void> fut = prom.get_future();
+    thread lbThread(std::bind(&LoadBalancerUDP::main, this, std::ref(prom)));
+    lbThread.join();
+    try {
+        fut.get();
+    } catch (const exception& e) {
+        throw e;
+    }
 }

@@ -6,6 +6,9 @@
 #include <random>
 #include <unordered_map>
 #include <vector>
+#include <future>
+#include <thread>
+#include <functional>
 
 #include "config.h"
 #include "udpSockets.h"
@@ -17,10 +20,13 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     ServerSocketUDP socket;
     const Config& cfg;
     const vector<unique_ptr<ServiceSocketUDP>>& services;
+    atomic<bool> running { false };
 
    public:
     explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services);
-    void main();
+    ~LoadBalancerUDP();
+    void stop();
+    void start();
 
    private:
     class BalanceStrategy {
@@ -55,4 +61,6 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     };
 
     unique_ptr<BalanceStrategy> balanceStrategy;
+
+    void main(promise<void>&);
 };

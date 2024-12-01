@@ -7,7 +7,19 @@
 
 using namespace std;
 
+LoadBalancerUDP * g_loadBalancer;
+
+void signalHandler(int signal) {
+    if (signal == SIGINT) {
+        if (g_loadBalancer != nullptr) {
+            g_loadBalancer->stop();
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
+    signal(SIGINT, signalHandler);
+
     // get destination ports from config.txt
     if (argc != 2) {
         cerr << "Usage: openloadbalancer [config file]" << endl;
@@ -61,5 +73,10 @@ int main(int argc, char *argv[]) {
 
     // start load balancer
     LoadBalancerUDP lb(config, services);
-    lb.main();
+    g_loadBalancer = &lb;
+    try {
+        lb.start();
+    } catch (const exception& e) {
+        cout << "An error occurred while shutting down: " << e.what() << endl;
+    }
 }
