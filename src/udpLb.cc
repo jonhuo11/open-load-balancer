@@ -1,6 +1,8 @@
 #include "udpLb.h"
 
-LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services) : socket(), cfg(cfg), services(services) {
+#include "terminal.h"
+
+LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services) : socket(), cfg(cfg), services(services), running(false) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;                      // IPv4
@@ -26,6 +28,8 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
         default:
             balanceStrategy = make_unique<RandomBalance>(*this);
     }
+
+    terminal = make_unique<Terminal>(*this);
 }
 
 LoadBalancerUDP::~LoadBalancerUDP() {
@@ -59,13 +63,13 @@ size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestination
     return destServiceIndex;
 }
 
-void LoadBalancerUDP::main(promise<void>& exceptionPromise) {
+void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
     try {
         FileDescriptor epoll(epoll_create1(0));
 
         const size_t MAX_EVENTS = 128;
         struct epoll_event event, events[MAX_EVENTS];  // 128 epoll events batched at a time
-        int epollTimeout = 0; // NOTE: -1 will BLOCK the thread!!!
+        int epollTimeout = 0;                          // NOTE: -1 will BLOCK the thread!!!
 
         PacketUDP packet = PacketUDP();  // used for reading in data
         struct sockaddr_in clientAddr;   // used for reading client ip/port
@@ -89,7 +93,7 @@ void LoadBalancerUDP::main(promise<void>& exceptionPromise) {
                     packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
                     packet.sender.ip = clientAddr.sin_addr.s_addr;
 
-                    if (nBytesRead < 0) { // TODO: write some error somehow?
+                    if (nBytesRead < 0) {  // TODO: write some error somehow?
                         continue;
                     }
                     size_t destServiceIndex = balanceStrategy->calculateDestinationServiceForPacket(packet);
@@ -97,7 +101,7 @@ void LoadBalancerUDP::main(promise<void>& exceptionPromise) {
                 }
             }
         }
-    } catch (const exception& e) {
+    } catch (const exception &e) {
         exceptionPromise.set_exception(make_exception_ptr(e));
         return;
     }
@@ -106,16 +110,19 @@ void LoadBalancerUDP::main(promise<void>& exceptionPromise) {
 
 void LoadBalancerUDP::stop() {
     running = false;
+    terminal->stop();
 }
 
 void LoadBalancerUDP::start() {
+    cout << "Starting load balancer..." << endl;
     promise<void> prom;
     future<void> fut = prom.get_future();
     thread lbThread(std::bind(&LoadBalancerUDP::main, this, std::ref(prom)));
+    terminal->start();
     lbThread.join();
     try {
         fut.get();
-    } catch (const exception& e) {
+    } catch (const exception &e) {
         throw e;
     }
 }

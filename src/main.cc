@@ -7,7 +7,7 @@
 
 using namespace std;
 
-LoadBalancerUDP * g_loadBalancer;
+LoadBalancerUDP* g_loadBalancer;
 
 void signalHandler(int signal) {
     if (signal == SIGINT) {
@@ -17,7 +17,7 @@ void signalHandler(int signal) {
     }
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
 
     // get destination ports from config.txt
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     }
 
     configFile.close();
-    cout << config << endl;
+    cout << config;
 
     // open client sockets for writing
     vector<unique_ptr<ServiceSocketUDP>> services(config.serviceCount);

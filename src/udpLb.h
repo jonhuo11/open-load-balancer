@@ -2,25 +2,29 @@
 
 #include <atomic>
 #include <csignal>
+#include <functional>
+#include <future>
 #include <iostream>
 #include <random>
+#include <thread>
 #include <unordered_map>
 #include <vector>
-#include <future>
-#include <thread>
-#include <functional>
 
 #include "config.h"
+#include "terminal.h"
 #include "udpSockets.h"
 #include "util.h"
 
 using namespace std;
 
+class Terminal;
+
 class LoadBalancerUDP : private NonCopyableNonMovable {
     ServerSocketUDP socket;
     const Config& cfg;
     const vector<unique_ptr<ServiceSocketUDP>>& services;
-    atomic<bool> running { false };
+    atomic<bool> running;
+    unique_ptr<Terminal> terminal;
 
    public:
     explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services);
