@@ -17,6 +17,15 @@ int ServiceSocketUDP::send(const char* message) {
     return sendto(getSocket(), message, strlen(message), 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
 }
 
+ostream& operator<<(ostream& os, const ServiceSocketUDP& socket) {
+    char ipStr[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &socket.destAddr.sin_addr, ipStr, sizeof(ipStr));
+    uint16_t port = ntohs(socket.destAddr.sin_port);
+
+    os << ipStr << ": " << port;
+    return os;
+}
+
 void ServerSocketUDP::bind(const sockaddr* addr, const socklen_t len) {
     if (::bind(getSocket(), addr, len) >= 0) binded = true;
 

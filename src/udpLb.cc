@@ -2,7 +2,7 @@
 
 #include "terminal.h"
 
-LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<ServiceSocketUDP>> &services) : socket(), cfg(cfg), services(services), running(false) {
+LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), services(cfg.serviceCount), running(false) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;                      // IPv4
@@ -15,6 +15,11 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
         // TODO: invalidate the lb
         cerr << "The load balancer could not bind to the socket on port " << cfg.listenPort << endl;
         throw;
+    }
+
+    // set up services
+    for (int i = 0; i < cfg.serviceCount; ++i) {
+        services[i] = make_unique<ServiceSocketUDP>("127.0.0.1", cfg.servicePorts[i]);  // localhost sockets
     }
 
     // pick strategy
@@ -34,33 +39,6 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg, const vector<unique_ptr<Serv
 
 LoadBalancerUDP::~LoadBalancerUDP() {
     cout << "\nShut down successfully" << endl;
-}
-
-LoadBalancerUDP::RandomBalance::RandomBalance(LoadBalancerUDP &lb) : BalanceStrategy(lb), gen(rdev()), distr(0, lb.services.size() - 1) {}
-
-size_t LoadBalancerUDP::RandomBalance::calculateDestinationServiceForPacket(PacketUDP &p) {
-    size_t destServiceIndex = (size_t)distr(gen);
-    return destServiceIndex;
-}
-
-LoadBalancerUDP::RoundRobinServiceAssignmentBalance::RoundRobinServiceAssignmentBalance(LoadBalancerUDP &lb) : BalanceStrategy(lb) {}
-
-size_t LoadBalancerUDP::RoundRobinServiceAssignmentBalance::calculateDestinationServiceForPacket(PacketUDP &p) {
-    // is it a new client?
-    auto destServiceIter = clientServiceMap.find(p.sender);
-    if (destServiceIter == clientServiceMap.end()) {
-        // assign to the next round
-        clientServiceMap[p.sender] = (round_i++) % lb.services.size();
-        destServiceIter = clientServiceMap.find(p.sender);
-    }
-    cout << "map" << endl;
-    for (const auto &pair : clientServiceMap) {
-        std::cout << pair.first << ": " << pair.second << std::endl;
-    }
-
-    // grab the client
-    size_t destServiceIndex = destServiceIter->second;
-    return destServiceIndex;
 }
 
 void LoadBalancerUDP::main(promise<void> &exceptionPromise) {

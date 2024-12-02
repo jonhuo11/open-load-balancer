@@ -27,22 +27,35 @@ Terminal& Terminal::operator<<(const std::string& line) {
     istringstream stream(line);
     string word;
     vector<string> tokens;
-    while (stream >> word) {
-        tokens.push_back(word);
-    }
-    // Create a vector of const strings
-    vector<string> constTokens(tokens.begin(), tokens.end());
-
-    executeLine(constTokens);
+    while (stream >> word) tokens.push_back(word);
+    executeLine(tokens);
     return *this;
 }
 
 void Terminal::executeLine(TerminalLineTokens& lineTokens) {
     if (lineTokens.size() < 1) throw LineExecutionError{};
 
+    const char* helpText = R"(
+Commands:
+quit
+help
+service_list
+    list services that are attached to the load balancer
+service_down [service_number]
+    bring a service down
+service_up [ip] [port]
+    register a new service
+service_health [service_number]
+    check the health of a specific service
+)";
+
     const string commandName = lineTokens[0];
     if (commandName == "quit") {
         lb.stop();
+    } else if (commandName == "help") {
+        cout << helpText << endl;
+    } else if (commandName == "service_list") {
+    } else if (commandName == "service_down") {
     } else {  // default behavior
         throw LineExecutionError{};
     }

@@ -22,11 +22,6 @@ Run `openloadbalancer [config_file]` to start the load balancer. This should ope
 Basic commands:
 - help: shows a full list of commands
 - quit: stop the load balancer
-- service_list: list services that are attached to the load balancer
-- service_down [service_number]: bring a service down
-- service_up [ip] [port]: register a new service
-- service_health [service_number]: check the health of a specific service
-
 
 # Demo
 

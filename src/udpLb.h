@@ -22,17 +22,18 @@ class Terminal;
 class LoadBalancerUDP : private NonCopyableNonMovable {
     ServerSocketUDP socket;
     const Config& cfg;
-    const vector<unique_ptr<ServiceSocketUDP>>& services;
+    vector<unique_ptr<ServiceSocketUDP>> services;
     atomic<bool> running;
     unique_ptr<Terminal> terminal;
 
    public:
-    explicit LoadBalancerUDP(const Config& cfg, const vector<unique_ptr<ServiceSocketUDP>>& services);
+    explicit LoadBalancerUDP(const Config& cfg);
     ~LoadBalancerUDP();
     void stop();
     void start();
 
    private:
+    // TODO: these should be singletons
     class BalanceStrategy {
        protected:
         LoadBalancerUDP& lb;
@@ -41,6 +42,11 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
         BalanceStrategy(LoadBalancerUDP& lb) : lb(lb) {};
         virtual size_t calculateDestinationServiceForPacket(PacketUDP& p) = 0;  // returns the index of the service socket to send packet to
         virtual ~BalanceStrategy() = default;
+
+        // a new service is registered
+        virtual void serviceUp(unique_ptr<ServiceSocketUDP>) = 0;
+        // a service is brought down
+        virtual void serviceDown(size_t downedServiceIndex) = 0;
     };
 
     // randomly pick a service and send the packet to it
@@ -52,9 +58,11 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
        public:
         RandomBalance(LoadBalancerUDP& lb);
         size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
+        void serviceUp(unique_ptr<ServiceSocketUDP>) override;
+        void serviceDown(size_t) override;
     };
 
-    // keep track of which clients are mapped to which services
+    // keep track of which clients are mapped to which services, based on IP and port hashing
     class RoundRobinServiceAssignmentBalance : public BalanceStrategy {
         size_t round_i = 0;                                        // which is the next server to assign to
         unordered_map<ClientIdentifier, size_t> clientServiceMap;  // TODO: if a service goes down, the mappings need to be updated
@@ -62,9 +70,10 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
        public:
         RoundRobinServiceAssignmentBalance(LoadBalancerUDP& lb);
         size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
+        void serviceUp(unique_ptr<ServiceSocketUDP>) override;
+        void serviceDown(size_t) override;
     };
 
     unique_ptr<BalanceStrategy> balanceStrategy;
-
     void main(promise<void>&);
 };

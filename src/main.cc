@@ -64,15 +64,8 @@ int main(int argc, char* argv[]) {
     configFile.close();
     cout << config;
 
-    // open client sockets for writing
-    vector<unique_ptr<ServiceSocketUDP>> services(config.serviceCount);
-    for (int i = 0; i < config.serviceCount; i++) {
-        services[i] = make_unique<ServiceSocketUDP>("127.0.0.1", config.servicePorts[i]);  // localhost sockets
-        cout << "Opened client socket at " << config.servicePorts[i] << endl;
-    }
-
     // start load balancer
-    LoadBalancerUDP lb(config, services);
+    LoadBalancerUDP lb(config);
     g_loadBalancer = &lb;
     try {
         lb.start();
