@@ -15,6 +15,14 @@ A layer 4 UDP load balancer written in C++ to learn more about networking, Linux
 9) Learn how to use concurrency library and see if this can be implemented
 10) More algorithms and configuration settings
 
+# Usage
+
+Run `openloadbalancer [config_file]` to start the load balancer. This should open a command line interface to interact with the running load balancer. See `config.example` for a sample config file format.
+
+Basic commands:
+- help: shows a full list of commands
+- quit: stop the load balancer
+
 # Demo
 
 There is demo code in `demopy`. Install requirements with `pip` and run using Python 3.

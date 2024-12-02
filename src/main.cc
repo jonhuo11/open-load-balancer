@@ -7,7 +7,19 @@
 
 using namespace std;
 
-int main(int argc, char *argv[]) {
+LoadBalancerUDP* g_loadBalancer;
+
+void signalHandler(int signal) {
+    if (signal == SIGINT) {
+        if (g_loadBalancer != nullptr) {
+            g_loadBalancer->stop();
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
+    signal(SIGINT, signalHandler);
+
     // get destination ports from config.txt
     if (argc != 2) {
         cerr << "Usage: openloadbalancer [config file]" << endl;
@@ -50,16 +62,14 @@ int main(int argc, char *argv[]) {
     }
 
     configFile.close();
-    cout << config << endl;
-
-    // open client sockets for writing
-    vector<unique_ptr<ServiceSocketUDP>> services(config.serviceCount);
-    for (int i = 0; i < config.serviceCount; i++) {
-        services[i] = make_unique<ServiceSocketUDP>("127.0.0.1", config.servicePorts[i]);  // localhost sockets
-        cout << "Opened client socket at " << config.servicePorts[i] << endl;
-    }
+    cout << config;
 
     // start load balancer
-    LoadBalancerUDP lb(config, services);
-    lb.main();
+    LoadBalancerUDP lb(config);
+    g_loadBalancer = &lb;
+    try {
+        lb.start();
+    } catch (const exception& e) {
+        cout << "An error occurred while shutting down: " << e.what() << endl;
+    }
 }
