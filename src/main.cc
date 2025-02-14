@@ -72,4 +72,6 @@ int main(int argc, char* argv[]) {
     } catch (const exception& e) {
         cout << "An error occurred while shutting down: " << e.what() << endl;
     }
+
+    delete[] config.servicePorts;
 }

@@ -45,8 +45,8 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
     try {
         FileDescriptor epoll(epoll_create1(0));
 
-        const size_t MAX_EVENTS = 128;
-        struct epoll_event event, events[MAX_EVENTS];  // 128 epoll events batched at a time
+        const size_t MAX_EVENTS = 1024;
+        struct epoll_event event, events[MAX_EVENTS];  // MAX_EVENTS epoll events batched at a time
         int epollTimeout = 0;                          // NOTE: -1 will BLOCK the thread!!!
 
         PacketUDP packet = PacketUDP();  // used for reading in data
@@ -66,7 +66,7 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
 
             // does not execute if nfds < 1
             for (int i = 0; i < nfds; ++i) {
-                if (events[i].events && EPOLLIN) {  // Data is available to read
+                if (events[i].events & EPOLLIN) {  // Data is available to read
                     ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
                     packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
                     packet.sender.ip = clientAddr.sin_addr.s_addr;
@@ -74,8 +74,7 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
                     if (nBytesRead < 0) {  // TODO: write some error somehow?
                         continue;
                     }
-                    size_t destServiceIndex = balanceStrategy->calculateDestinationServiceForPacket(packet);
-                    services[destServiceIndex]->send(packet.data);
+                    balanceStrategy->routePacket(packet);
                 }
             }
         }

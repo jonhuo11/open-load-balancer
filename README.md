@@ -12,7 +12,7 @@ A layer 4 UDP load balancer written in C++ to learn more about networking, Linux
 6) Command line interface for bringing up load balancer with settings, and updating load balancer configuration while it is running. This will require some basic threading (WIP)
 7) Bidirectional UDP data: servers should be able to send UDP data back to the client they received the data from
 8) Learn about ways to improve performance and implement them, perhaps by studying NGINX
-9) Learn how to use concurrency library and see if this can be implemented
+9) Learn how to use concurrency library and see if this can be implemented (ideally multiple workers reading packets from a queue and doing work)
 10) More algorithms and configuration settings
 
 # Usage

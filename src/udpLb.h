@@ -8,7 +8,6 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 #include "config.h"
 #include "terminal.h"
@@ -22,7 +21,7 @@ class Terminal;
 class LoadBalancerUDP : private NonCopyableNonMovable {
     ServerSocketUDP socket;
     const Config& cfg;
-    vector<unique_ptr<ServiceSocketUDP>> services;
+    unordered_map<size_t, unique_ptr<ServiceSocketUDP>> services;
     atomic<bool> running;
     unique_ptr<Terminal> terminal;
 
@@ -40,11 +39,11 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
 
        public:
         BalanceStrategy(LoadBalancerUDP& lb) : lb(lb) {};
-        virtual size_t calculateDestinationServiceForPacket(PacketUDP& p) = 0;  // returns the index of the service socket to send packet to
+        virtual void routePacket(PacketUDP& p) = 0;
         virtual ~BalanceStrategy() = default;
 
         // a new service is registered
-        virtual void serviceUp(unique_ptr<ServiceSocketUDP>) = 0;
+        virtual void serviceUp(unique_ptr<ServiceSocketUDP>&&) = 0;
         // a service is brought down
         virtual void serviceDown(size_t downedServiceIndex) = 0;
     };
@@ -57,20 +56,20 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
 
        public:
         RandomBalance(LoadBalancerUDP& lb);
-        size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
-        void serviceUp(unique_ptr<ServiceSocketUDP>) override;
+        void serviceUp(unique_ptr<ServiceSocketUDP>&&) override;
         void serviceDown(size_t) override;
     };
 
     // keep track of which clients are mapped to which services, based on IP and port hashing
     class RoundRobinServiceAssignmentBalance : public BalanceStrategy {
         size_t round_i = 0;                                        // which is the next server to assign to
-        unordered_map<ClientIdentifier, size_t> clientServiceMap;  // TODO: if a service goes down, the mappings need to be updated
+        unordered_map<ClientIdentifier, size_t> clientToService;
+        unordered_map<size_t, vector<ClientIdentifier>> serviceToClients;
 
        public:
         RoundRobinServiceAssignmentBalance(LoadBalancerUDP& lb);
-        size_t calculateDestinationServiceForPacket(PacketUDP& p) override;
-        void serviceUp(unique_ptr<ServiceSocketUDP>) override;
+        void routePacket(PacketUDP& p) override;
+        void serviceUp(unique_ptr<ServiceSocketUDP>&&) override;
         void serviceDown(size_t) override;
     };
 
