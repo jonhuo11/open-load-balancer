@@ -8,8 +8,8 @@ CXXFLAGS = -Wall -Wextra -std=c++23 -O2
 SRC_DIR = src
 BUILD_DIR = build
 
-# Find all source files with .cc extension
-SRCS = $(wildcard $(SRC_DIR)/*.cc)
+# Find all source files with .cc extension and exclude test files
+SRCS = $(filter-out $(SRC_DIR)/test_%, $(wildcard $(SRC_DIR)/*.cc))
 
 # Generate corresponding object files in build directory
 OBJS = $(patsubst $(SRC_DIR)/%.cc,$(BUILD_DIR)/%.o,$(SRCS))

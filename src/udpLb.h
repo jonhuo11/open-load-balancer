@@ -56,6 +56,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
 
        public:
         RandomBalance(LoadBalancerUDP& lb);
+        void routePacket(PacketUDP& p) override;
         void serviceUp(unique_ptr<ServiceSocketUDP>&&) override;
         void serviceDown(size_t) override;
     };
