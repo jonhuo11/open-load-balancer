@@ -55,6 +55,7 @@ service_health [service_number]
     } else if (commandName == "help") {
         cout << helpText << endl;
     } else if (commandName == "service_list") {
+    } else if (commandName == "service_up") {
     } else if (commandName == "service_down") {
     } else {  // default behavior
         throw LineExecutionError{};

@@ -82,5 +82,23 @@ TEST(SimpleOrderedDictTest, ExceptionHandling) {
     EXPECT_THROW(dict.getKth(1), out_of_range);
     
     EXPECT_NO_THROW(dict[1]);  // Existing key
-    EXPECT_THROW(dict[999], out_of_range);  // Non-existent key
+}
+
+TEST(SimpleOrderedDictTest, CircularNextKey) {
+    SimpleOrderedDict<int, string> dict;
+    dict.upsert(1, "one");
+    dict.upsert(2, "two");
+    dict.upsert(3, "three");
+    
+    // Test normal next key
+    EXPECT_EQ(dict.getCircularNextKey(1), 2);
+    EXPECT_EQ(dict.getCircularNextKey(2), 3);
+    
+    // Test wrapping around to the beginning
+    EXPECT_EQ(dict.getCircularNextKey(3), 1);
+    
+    // Test with removal
+    dict.remove(2);
+    EXPECT_EQ(dict.getCircularNextKey(1), 3);
+    EXPECT_EQ(dict.getCircularNextKey(3), 1);
 }

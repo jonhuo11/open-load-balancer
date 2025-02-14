@@ -9,6 +9,7 @@
 #include <thread>
 #include <unordered_map>
 
+#include "simpleOrderedDict.h"
 #include "config.h"
 #include "terminal.h"
 #include "udpSockets.h"
@@ -21,7 +22,7 @@ class Terminal;
 class LoadBalancerUDP : private NonCopyableNonMovable {
     ServerSocketUDP socket;
     const Config& cfg;
-    unordered_map<size_t, unique_ptr<ServiceSocketUDP>> services;
+    SimpleOrderedDict<size_t, unique_ptr<ServiceSocketUDP>> services;
     atomic<bool> running;
     unique_ptr<Terminal> terminal;
 
@@ -35,15 +36,15 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     // TODO: these should be singletons
     class BalanceStrategy {
        protected:
-        LoadBalancerUDP& lb;
+        const LoadBalancerUDP& lb;
 
        public:
-        BalanceStrategy(LoadBalancerUDP& lb) : lb(lb) {};
+        BalanceStrategy(const LoadBalancerUDP& lb) : lb(lb) {};
         virtual void routePacket(PacketUDP& p) = 0;
         virtual ~BalanceStrategy() = default;
 
         // a new service is registered
-        virtual void serviceUp(unique_ptr<ServiceSocketUDP>&&) = 0;
+        virtual void serviceUp(size_t serviceKey) = 0;
         // a service is brought down
         virtual void serviceDown(size_t downedServiceIndex) = 0;
     };
@@ -55,23 +56,30 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
         uniform_int_distribution<> distr;
 
        public:
-        RandomBalance(LoadBalancerUDP& lb);
+        RandomBalance(const LoadBalancerUDP& lb);
         void routePacket(PacketUDP& p) override;
-        void serviceUp(unique_ptr<ServiceSocketUDP>&&) override;
+        void serviceUp(size_t serviceKey) override;
         void serviceDown(size_t) override;
     };
 
     // keep track of which clients are mapped to which services, based on IP and port hashing
     class RoundRobinServiceAssignmentBalance : public BalanceStrategy {
-        size_t round_i = 0;                                        // which is the next server to assign to
+        size_t currentReadyServiceKey = 0;                                        // which is the next server to assign to
+        size_t nextReadyServiceKey = 0;
+
+        // TODO: avoid making copy of the ClientIdentifier struct
         unordered_map<ClientIdentifier, size_t> clientToService;
         unordered_map<size_t, vector<ClientIdentifier>> serviceToClients;
 
        public:
-        RoundRobinServiceAssignmentBalance(LoadBalancerUDP& lb);
+        RoundRobinServiceAssignmentBalance(const LoadBalancerUDP& lb);
         void routePacket(PacketUDP& p) override;
-        void serviceUp(unique_ptr<ServiceSocketUDP>&&) override;
+        void serviceUp(size_t serviceKey) override;
         void serviceDown(size_t) override;
+
+       private:
+        void switchServiceKeys();
+
     };
 
     unique_ptr<BalanceStrategy> balanceStrategy;

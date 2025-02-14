@@ -2,7 +2,7 @@
 
 #include "terminal.h"
 
-LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), services(cfg.serviceCount), running(false) {
+LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), services(), running(false) {
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;                      // IPv4
@@ -15,6 +15,10 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), servic
         // TODO: invalidate the lb
         cerr << "The load balancer could not bind to the socket on port " << cfg.listenPort << endl;
         throw;
+    }
+
+    if (cfg.serviceCount < 1) {
+        throw invalid_argument("Service count cannot be < 1");
     }
 
     // set up services

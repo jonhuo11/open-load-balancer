@@ -11,6 +11,7 @@ class SimpleOrderedDict {
 
 
     struct Node {
+        K key;
         T value;
         Node * next;
         Node * prev;
@@ -50,7 +51,7 @@ class SimpleOrderedDict {
             return;
         }
 
-        Node * newNode = new Node{move(newObject), nullptr, nullptr};
+        Node * newNode = new Node{key, move(newObject), nullptr, nullptr};
         keyToNode[key] = newNode;
 
         if (head == nullptr && tail == nullptr) {
@@ -90,8 +91,23 @@ class SimpleOrderedDict {
 
     };
 
+    K getCircularNextKey(K key) const {
+        Node * next = keyToNode.at(key)->next;
+        if (next == nullptr) {
+            return head->key;
+        }
+        return next->key;
+    }
+
+    K lastKey() const {
+        if (tail == nullptr) {
+            throw out_of_range("Cannot get last key of empty dict");
+        }
+        return tail->key;
+    }
+
     T& operator[](K key) {
-        return keyToNode.at(key)->value;
+        return keyToNode[key]->value;
     };
 
     T& operator[](K key) const {

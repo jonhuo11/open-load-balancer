@@ -13,7 +13,7 @@ ServiceSocketUDP::ServiceSocketUDP(const char* ip, uint16_t port) : SocketUDP() 
 
 ServiceSocketUDP::~ServiceSocketUDP() {}
 
-int ServiceSocketUDP::send(const char* message) {
+int ServiceSocketUDP::send(const char* message) const {
     return sendto(getSocket(), message, strlen(message), 0, (struct sockaddr*)&destAddr, sizeof(destAddr));
 }
 
