@@ -9,6 +9,7 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), servic
     serverAddr.sin_port = htons(cfg.listenPort);          // Port number
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");  // Localhost IP address
 
+
     try {
         socket.bind((struct sockaddr *)&serverAddr, sizeof(serverAddr));
     } catch (runtime_error &) {
@@ -17,13 +18,15 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), servic
         throw;
     }
 
+
     if (cfg.serviceCount < 1) {
         throw invalid_argument("Service count cannot be < 1");
     }
 
+
     // set up services
     for (int i = 0; i < cfg.serviceCount; ++i) {
-        services[i] = make_unique<ServiceSocketUDP>("127.0.0.1", cfg.servicePorts[i]);  // localhost sockets
+        services.upsert(i, make_unique<ServiceSocketUDP>("127.0.0.1", cfg.servicePorts[i]));  // localhost sockets
     }
 
     // pick strategy

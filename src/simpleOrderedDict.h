@@ -107,7 +107,7 @@ class SimpleOrderedDict {
     }
 
     T& operator[](K key) {
-        return keyToNode[key]->value;
+        return keyToNode.at(key)->value;
     };
 
     T& operator[](K key) const {

@@ -60,18 +60,17 @@ int main(int argc, char* argv[]) {
         }
         config.servicePorts[i] = clientPort;
     }
+    
 
     configFile.close();
-    cout << config;
+    cout << config << endl;
 
     // start load balancer
-    LoadBalancerUDP lb(config);
-    g_loadBalancer = &lb;
+    auto lb = make_unique<LoadBalancerUDP>(config);
+    g_loadBalancer = lb.get();
     try {
-        lb.start();
+        lb->start();
     } catch (const exception& e) {
         cout << "An error occurred while shutting down: " << e.what() << endl;
     }
-
-    delete[] config.servicePorts;
 }
