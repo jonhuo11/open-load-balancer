@@ -31,7 +31,7 @@ size_t LoadBalancerUDP::RoundRobinBalance::RoundRobinBalance::ServiceKeyManager:
     return nextReadyServiceKey;
 }
 
-void LoadBalancerUDP::RoundRobinBalance::routePacket(PacketUDP &p) {
+void LoadBalancerUDP::RoundRobinBalance::routePacket(const PacketUDP &p) {
     if (clientToService.contains(p.sender)) {
         // packet from the same client must go to the same receiver
         lb.services[clientToService[p.sender]].get()->send(p.data);

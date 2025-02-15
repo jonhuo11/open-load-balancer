@@ -31,6 +31,10 @@ public:
     ~LoadBalancerUDP();
     void stop();
     void start();
+    const ServerSocketUDP& getSocket() const;
+    void setRunning(bool);
+    bool isRunning() const;
+    void routePacket(const PacketUDP& packet);
 
 private:
     class BalanceStrategy {
@@ -39,7 +43,7 @@ private:
 
     public:
         BalanceStrategy(const LoadBalancerUDP& lb) : lb(lb) {};
-        virtual void routePacket(PacketUDP& p) = 0;
+        virtual void routePacket(const PacketUDP& p) = 0;
         virtual ~BalanceStrategy() = default;
 
         // a new service is registered
@@ -56,7 +60,7 @@ private:
 
     public:
         RandomBalance(const LoadBalancerUDP& lb);
-        void routePacket(PacketUDP& p) override;
+        void routePacket(const PacketUDP& p) override;
         void serviceUp(size_t serviceKey) override;
         void serviceDown(size_t) override;
     };
@@ -85,7 +89,7 @@ private:
 
     public:
         RoundRobinBalance(const LoadBalancerUDP& lb);
-        void routePacket(PacketUDP& p) override;
+        void routePacket(const PacketUDP& p) override;
         void serviceUp(size_t serviceKey) override;
         void serviceDown(size_t) override;
 
@@ -93,5 +97,6 @@ private:
 
 private:
     unique_ptr<BalanceStrategy> balanceStrategy;
-    void main(promise<void>&);
 };
+
+void loadBalancerThread(LoadBalancerUDP& lb, promise<void>&);

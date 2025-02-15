@@ -45,7 +45,46 @@ LoadBalancerUDP::~LoadBalancerUDP() {
     cout << "\nShut down successfully" << endl;
 }
 
-void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
+void LoadBalancerUDP::stop() {
+    running = false;
+    terminal->stop();
+}
+
+void LoadBalancerUDP::start() {
+    cout << "Starting load balancer..." << endl;
+    promise<void> prom;
+    future<void> fut = prom.get_future();
+
+    // terminal runs on this thread, load balancer runs on separate
+    thread lbThread([this, &prom] { loadBalancerThread(*this, prom); });
+    terminal->start();
+
+    lbThread.join(); // wait until both are stopped
+    try {
+        fut.get();
+    } catch (const exception &e) {
+        throw e;
+    }
+}
+
+const ServerSocketUDP& LoadBalancerUDP::getSocket() const {
+ return socket;
+}
+
+void LoadBalancerUDP::setRunning(bool b) {
+    running.store(b, memory_order_release);
+}
+
+bool LoadBalancerUDP::isRunning() const {
+    return running.load(memory_order_relaxed);
+}
+
+void LoadBalancerUDP::routePacket(const PacketUDP& packet) {
+    balanceStrategy->routePacket(packet);
+}
+
+
+void loadBalancerThread(LoadBalancerUDP& lb, promise<void> &exceptionPromise) {
     try {
         FileDescriptor epoll(epoll_create1(0));
 
@@ -58,11 +97,11 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
         socklen_t clientLen = sizeof(clientAddr);
 
         event.events = EPOLLIN;
-        event.data.fd = socket.getSocket();
-        if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, socket.getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
+        event.data.fd = lb.getSocket().getSocket();
+        if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, lb.getSocket().getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
 
-        running = true;
-        while (running) {
+        lb.setRunning(true);
+        while (lb.isRunning()) {
             int nfds = epoll_wait(epoll.getFd(), events, MAX_EVENTS, epollTimeout);
             if (nfds < 0) {
                 throw runtime_error("epoll_wait failed");
@@ -71,14 +110,15 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
             // does not execute if nfds < 1
             for (int i = 0; i < nfds; ++i) {
                 if (events[i].events & EPOLLIN) {  // Data is available to read
-                    ssize_t nBytesRead = recvfrom(socket.getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
+                    ssize_t nBytesRead = recvfrom(lb.getSocket().getSocket(), packet.data, PacketUDP::BUFFER_SIZE, 0, (struct sockaddr *)&clientAddr, &clientLen);
                     packet.sender.port = clientAddr.sin_port;  // TODO: can we directly copy into this field for speed?
                     packet.sender.ip = clientAddr.sin_addr.s_addr;
 
                     if (nBytesRead < 0) {  // TODO: write some error somehow?
                         continue;
                     }
-                    balanceStrategy->routePacket(packet);
+
+                    lb.routePacket(packet);
                 }
             }
         }
@@ -87,23 +127,4 @@ void LoadBalancerUDP::main(promise<void> &exceptionPromise) {
         return;
     }
     exceptionPromise.set_value();
-}
-
-void LoadBalancerUDP::stop() {
-    running = false;
-    terminal->stop();
-}
-
-void LoadBalancerUDP::start() {
-    cout << "Starting load balancer..." << endl;
-    promise<void> prom;
-    future<void> fut = prom.get_future();
-    thread lbThread(std::bind(&LoadBalancerUDP::main, this, std::ref(prom)));
-    terminal->start();
-    lbThread.join();
-    try {
-        fut.get();
-    } catch (const exception &e) {
-        throw e;
-    }
 }

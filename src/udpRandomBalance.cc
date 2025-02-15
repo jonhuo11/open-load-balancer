@@ -2,7 +2,7 @@
 
 LoadBalancerUDP::RandomBalance::RandomBalance(const LoadBalancerUDP &lb) : BalanceStrategy(lb), gen(rdev()), distr(0, lb.services.size() - 1) {}
 
-void LoadBalancerUDP::RandomBalance::routePacket(PacketUDP& p) {
+void LoadBalancerUDP::RandomBalance::routePacket(const PacketUDP& p) {
 	
 }
 

@@ -2,6 +2,8 @@
 
 A layer 4 UDP load balancer written in C++ to learn more about networking, Linux sockets, and C++ for performance.
 
+Load balancer has client-server affinity but servers cannot respond to clients through the load balancer, they must implement DSR.
+
 # Development stages
 
 1) Server can read incoming byte data on a UDP socket (DONE)
@@ -10,10 +12,11 @@ A layer 4 UDP load balancer written in C++ to learn more about networking, Linux
 4) Server can take incoming IP address from header and route same IP to same client to preserve context (DONE)
 5) Server is connected to services and knows if a service goes down, and can adjust to it (WIP)
 6) Command line interface for bringing up load balancer with settings, and updating load balancer configuration while it is running. This will require some basic threading (WIP)
-7) Bidirectional UDP data: servers should be able to send UDP data back to the client they received the data from
-8) Learn about ways to improve performance and implement them, perhaps by studying NGINX
-9) Learn how to use concurrency library and see if this can be implemented (ideally multiple workers reading packets from a queue and doing work)
-10) More algorithms and configuration settings
+7) Clients that have not sent traffic in the last X mins should be removed from client-server mappings
+8) Bidirectional UDP data: servers should be able to send UDP data back to the client they received the data from
+9) Learn about ways to improve performance and implement them, perhaps by studying NGINX
+10) Learn how to use concurrency library and see if this can be implemented (ideally multiple workers reading packets from a queue and doing work)
+11) More algorithms and configuration settings
 
 # Usage
 
