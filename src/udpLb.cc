@@ -32,7 +32,7 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), servic
             balanceStrategy = make_unique<RandomBalance>(*this);
             break;
         case 1:  // rr
-            balanceStrategy = make_unique<RoundRobinServiceAssignmentBalance>(*this);
+            balanceStrategy = make_unique<RoundRobinBalance>(*this);
             break;
         default:
             balanceStrategy = make_unique<RandomBalance>(*this);

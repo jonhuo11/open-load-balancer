@@ -26,19 +26,18 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     atomic<bool> running;
     unique_ptr<Terminal> terminal;
 
-   public:
+public:
     explicit LoadBalancerUDP(const Config& cfg);
     ~LoadBalancerUDP();
     void stop();
     void start();
 
-   private:
-    // TODO: these should be singletons
+private:
     class BalanceStrategy {
-       protected:
+    protected:
         const LoadBalancerUDP& lb;
 
-       public:
+    public:
         BalanceStrategy(const LoadBalancerUDP& lb) : lb(lb) {};
         virtual void routePacket(PacketUDP& p) = 0;
         virtual ~BalanceStrategy() = default;
@@ -55,7 +54,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
         mt19937 gen;
         uniform_int_distribution<> distr;
 
-       public:
+    public:
         RandomBalance(const LoadBalancerUDP& lb);
         void routePacket(PacketUDP& p) override;
         void serviceUp(size_t serviceKey) override;
@@ -63,25 +62,36 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     };
 
     // keep track of which clients are mapped to which services, based on IP and port hashing
-    class RoundRobinServiceAssignmentBalance : public BalanceStrategy {
-        size_t currentReadyServiceKey = 0;                                        // which is the next server to assign to
-        size_t nextReadyServiceKey = 0;
+    class RoundRobinBalance : public BalanceStrategy {
+        class ServiceKeyManager {
+            const RoundRobinBalance& balancer;
+            size_t currentReadyServiceKey = 0;                                        // which is the next server to assign to
+            size_t nextReadyServiceKey = 0;
+            
+        public:
+            ServiceKeyManager(const RoundRobinBalance&);
+            size_t getCurrentReadyServiceKey() const;
+            size_t getNextReadyServiceKey() const;
+            void updateCurrentReadyServiceKey();
+            void updateNextReadyServiceKey();
+            void setCurrentReadyServiceKeyToLastServiceKey();
+        };
+
+        ServiceKeyManager skm;
 
         // TODO: avoid making copy of the ClientIdentifier struct
         unordered_map<ClientIdentifier, size_t> clientToService;
         unordered_map<size_t, vector<ClientIdentifier>> serviceToClients;
 
-       public:
-        RoundRobinServiceAssignmentBalance(const LoadBalancerUDP& lb);
+    public:
+        RoundRobinBalance(const LoadBalancerUDP& lb);
         void routePacket(PacketUDP& p) override;
         void serviceUp(size_t serviceKey) override;
         void serviceDown(size_t) override;
 
-       private:
-        void switchServiceKeys();
-
     };
 
+private:
     unique_ptr<BalanceStrategy> balanceStrategy;
     void main(promise<void>&);
 };

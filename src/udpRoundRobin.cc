@@ -1,19 +1,37 @@
 #include "udpLb.h"
 
-LoadBalancerUDP::RoundRobinServiceAssignmentBalance::ServiceKeyManager::ServiceKeyManager(const RoundRobinServiceAssignmentBalance& b): balancer(b) {
+LoadBalancerUDP::RoundRobinBalance::ServiceKeyManager::ServiceKeyManager(const RoundRobinBalance& b): balancer(b) {
 
 }
 
-void LoadBalancerUDP::RoundRobinServiceAssignmentBalance::ServiceKeyManager::updateCurrentReadyServiceKey() {
+void LoadBalancerUDP::RoundRobinBalance::ServiceKeyManager::updateCurrentReadyServiceKey() {
     currentReadyServiceKey = nextReadyServiceKey;
     nextReadyServiceKey = balancer.lb.services.getCircularNextKey(currentReadyServiceKey);
 }
 
-LoadBalancerUDP::RoundRobinServiceAssignmentBalance::RoundRobinServiceAssignmentBalance(const LoadBalancerUDP &lb) : BalanceStrategy(lb) {
+void LoadBalancerUDP::RoundRobinBalance::ServiceKeyManager::updateNextReadyServiceKey() {
+    nextReadyServiceKey = balancer.lb.services.getCircularNextKey(currentReadyServiceKey);
+}
+
+void LoadBalancerUDP::RoundRobinBalance::ServiceKeyManager::setCurrentReadyServiceKeyToLastServiceKey() {
+    currentReadyServiceKey = balancer.lb.services.lastKey();
+    updateNextReadyServiceKey();
+}
+
+LoadBalancerUDP::RoundRobinBalance::RoundRobinBalance(const LoadBalancerUDP &lb) 
+    : BalanceStrategy(lb), skm(*this) {
     skm.setCurrentReadyServiceKeyToLastServiceKey();
 }
 
-void LoadBalancerUDP::RoundRobinServiceAssignmentBalance::routePacket(PacketUDP &p) {
+size_t LoadBalancerUDP::RoundRobinBalance::RoundRobinBalance::ServiceKeyManager::getCurrentReadyServiceKey() const {
+    return currentReadyServiceKey;
+}
+
+size_t LoadBalancerUDP::RoundRobinBalance::RoundRobinBalance::ServiceKeyManager::getNextReadyServiceKey() const {
+    return nextReadyServiceKey;
+}
+
+void LoadBalancerUDP::RoundRobinBalance::routePacket(PacketUDP &p) {
     if (clientToService.contains(p.sender)) {
         // packet from the same client must go to the same receiver
         lb.services[clientToService[p.sender]].get()->send(p.data);
@@ -26,25 +44,34 @@ void LoadBalancerUDP::RoundRobinServiceAssignmentBalance::routePacket(PacketUDP 
 }
 
 
-void LoadBalancerUDP::RoundRobinServiceAssignmentBalance::serviceUp(size_t serviceKey) {
+void LoadBalancerUDP::RoundRobinBalance::serviceUp(size_t serviceKey) {
     
 }
 
-void LoadBalancerUDP::RoundRobinServiceAssignmentBalance::serviceDown(size_t downedServiceKey) {
+void LoadBalancerUDP::RoundRobinBalance::serviceDown(size_t downedServiceKey) {
     if (lb.services.size() == 0) {
         throw runtime_error("There are 0 services");
     }
+    if (downedServiceKey == skm.getCurrentReadyServiceKey() && downedServiceKey == skm.getNextReadyServiceKey()) {
+        throw runtime_error("Bad service key states");
+    }
 
     if (downedServiceKey == skm.getCurrentReadyServiceKey()) {
-        if (downedServiceKey == skm.getNextReadyServiceKey()) {
-            throw runtime_error("Bad next ready service key");
-        }
-
         skm.updateCurrentReadyServiceKey();
+    } else if (downedServiceKey == skm.getNextReadyServiceKey()) {
+        skm.updateNextReadyServiceKey();
     }
 
     // migrate all existing clients from the downed service to new services
-    
+    // assume the skm keys are valid
+    for (auto& clientId : serviceToClients[downedServiceKey]) {
+        clientToService[clientId] = skm.getCurrentReadyServiceKey();
+    }
+    auto& downedServiceClientList = serviceToClients[downedServiceKey];
+    auto& destinationServiceClientList = serviceToClients[skm.getCurrentReadyServiceKey()];
+    destinationServiceClientList.insert(destinationServiceClientList.end(), downedServiceClientList.begin(), downedServiceClientList.end());
 
     // remove the downed service
+    serviceToClients.erase(downedServiceKey);
+    
 }
