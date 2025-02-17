@@ -21,12 +21,13 @@ void Terminal::start() {
 
 void Terminal::stop() {
     running = false;
+    cout << "Shutting down terminal..." << endl;
 }
 
 Terminal& Terminal::operator<<(const std::string& line) {
     istringstream stream(line);
     string word;
-    vector<string> tokens;
+    vector<string> tokens; // TODO: we can optimise this by not creating a new vector every time and just overwriting the old one
     while (stream >> word) tokens.push_back(word);
     executeLine(tokens);
     return *this;
@@ -52,11 +53,20 @@ service_health [service_number]
     const string commandName = lineTokens[0];
     if (commandName == "quit") {
         lb.stop();
+        //cout << "quitting lb done" << endl;
+        stop();
+        //cout << "quitting done" << endl;
     } else if (commandName == "help") {
         cout << helpText << endl;
     } else if (commandName == "service_list") {
+        auto list = lb.listServices();
+        for (const auto& service : list) {
+            cout << service << endl;
+        }
     } else if (commandName == "service_up") {
     } else if (commandName == "service_down") {
+        if (lineTokens.size() != 2) { throw LineExecutionError{}; }
+        lb.serviceDown(stoull(lineTokens[1]));
     } else {  // default behavior
         throw LineExecutionError{};
     }

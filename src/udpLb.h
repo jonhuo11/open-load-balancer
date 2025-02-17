@@ -8,6 +8,9 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
+#include <shared_mutex>
+#include <sstream>
+#include <iterator>
 
 #include "simpleOrderedDict.h"
 #include "config.h"
@@ -25,6 +28,7 @@ class LoadBalancerUDP : private NonCopyableNonMovable {
     SimpleOrderedDict<size_t, unique_ptr<ServiceSocketUDP>> services;
     atomic<bool> running;
     unique_ptr<Terminal> terminal;
+    mutable shared_mutex mutex;
 
 public:
     explicit LoadBalancerUDP(const Config& cfg);
@@ -32,9 +36,11 @@ public:
     void stop();
     void start();
     const ServerSocketUDP& getSocket() const;
-    void setRunning(bool);
     bool isRunning() const;
     void routePacket(const PacketUDP& packet);
+    string listServices() const;
+    void serviceUp(const char* ip, uint16_t port);
+    void serviceDown (const size_t& serviceKey);
 
 private:
     class BalanceStrategy {
@@ -99,4 +105,4 @@ private:
     unique_ptr<BalanceStrategy> balanceStrategy;
 };
 
-void loadBalancerThread(LoadBalancerUDP& lb, promise<void>&);
+void loadBalancerSingleThreaded(LoadBalancerUDP& lb, promise<void>&);

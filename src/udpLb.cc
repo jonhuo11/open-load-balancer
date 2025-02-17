@@ -45,24 +45,42 @@ LoadBalancerUDP::LoadBalancerUDP(const Config &cfg) : socket(), cfg(cfg), servic
 }
 
 LoadBalancerUDP::~LoadBalancerUDP() {
+    if (running.load()) {
+        stop();
+    }
     cout << "\nShut down successfully" << endl;
 }
 
 void LoadBalancerUDP::stop() {
-    running = false;
-    terminal->stop();
+    //cout << "got to stopping lb" << endl;
+    unique_lock<shared_mutex> lock(mutex); // TODO: not sure if this needed since running is atomic anyways
+    //cout << "completed lock acquisition" << endl;
+    if (!running.load()) { return; }
+    //cout << "completed running check" << endl;
+    running.store(false);
+    //cout << "done quitting in lb" << endl;
 }
 
 void LoadBalancerUDP::start() {
     cout << "Starting load balancer..." << endl;
+    unique_lock<shared_mutex> lock(mutex);
+    if (running.load()) {
+        return;
+    }
+    running.store(true);
+    lock.unlock();
     promise<void> prom;
     future<void> fut = prom.get_future();
+    thread lbThread;
 
-    // terminal runs on this thread, load balancer runs on separate
-    thread lbThread([this, &prom] { loadBalancerThread(*this, prom); });
+    lbThread = thread([this, &prom] { loadBalancerSingleThreaded(*this, prom); });
     terminal->start();
+    //cout << "terminal done" << endl;
 
-    lbThread.join(); // wait until both are stopped
+    if (lbThread.joinable()) {
+        //cout << "waiting to join" << endl;
+        lbThread.join();
+    }
     try {
         fut.get();
     } catch (const exception &e) {
@@ -71,23 +89,42 @@ void LoadBalancerUDP::start() {
 }
 
 const ServerSocketUDP& LoadBalancerUDP::getSocket() const {
- return socket;
+    shared_lock<shared_mutex> lock(mutex);
+    return socket;
 }
 
-void LoadBalancerUDP::setRunning(bool b) {
-    running.store(b, memory_order_release);
-}
-
-bool LoadBalancerUDP::isRunning() const {
-    return running.load(memory_order_relaxed);
+bool LoadBalancerUDP::isRunning() const { // TODO: revisit this once I figure out if this needs a mutex or not
+    shared_lock<shared_mutex> lock(mutex);
+    return running.load();
 }
 
 void LoadBalancerUDP::routePacket(const PacketUDP& packet) {
+    unique_lock<shared_mutex> lock(mutex);
     balanceStrategy->routePacket(packet);
 }
 
+string LoadBalancerUDP::listServices() const {
+    shared_lock<shared_mutex> lock(mutex);
+    auto serviceKeys = services.keys();
+    ostringstream oss;
+    if (!serviceKeys.empty()) {
+        copy(serviceKeys.begin(), serviceKeys.end() - 1, ostream_iterator<size_t>(oss, " "));
+        oss << serviceKeys.back(); // Add the last element without a trailing space
+    }
+    return oss.str();
+}
 
-void loadBalancerThread(LoadBalancerUDP& lb, promise<void> &exceptionPromise) {
+void LoadBalancerUDP::serviceUp(const char* ip, uint16_t port) {
+    unique_lock<shared_mutex> lock(mutex);
+}
+
+void LoadBalancerUDP::serviceDown (const size_t& serviceKey) {
+    unique_lock<shared_mutex> lock(mutex);
+    balanceStrategy->serviceDown(serviceKey);
+}
+
+
+void loadBalancerSingleThreaded(LoadBalancerUDP& lb, promise<void> &exceptionPromise) {
     try {
         FileDescriptor epoll(epoll_create1(0));
 
@@ -103,7 +140,6 @@ void loadBalancerThread(LoadBalancerUDP& lb, promise<void> &exceptionPromise) {
         event.data.fd = lb.getSocket().getSocket();
         if (epoll_ctl(epoll.getFd(), EPOLL_CTL_ADD, lb.getSocket().getSocket(), &event) < 0) throw runtime_error("epoll_ctl < 0");
 
-        lb.setRunning(true);
         while (lb.isRunning()) {
             int nfds = epoll_wait(epoll.getFd(), events, MAX_EVENTS, epollTimeout);
             if (nfds < 0) {

@@ -118,6 +118,16 @@ class SimpleOrderedDict {
         return keyToNode.size();
     }
 
+    vector<K> keys() const {
+        vector<K> keysVector (keyToNode.size());
+        size_t i = 0;
+        for (const auto& [key, _] : keyToNode) {
+            keysVector[i] = key;
+            i ++;
+        }
+        return keysVector;
+    }
+
     // throws if k is not in range
     T& getKth(size_t k) const {
         if (k >= size()) {

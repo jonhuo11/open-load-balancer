@@ -73,4 +73,6 @@ int main(int argc, char* argv[]) {
     } catch (const exception& e) {
         cout << "An error occurred while shutting down: " << e.what() << endl;
     }
+    // start() will not end until the load balancer thread stops, and the dtor for the load balancer is 
+    // called here
 }
