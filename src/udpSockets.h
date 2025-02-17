@@ -33,7 +33,8 @@ class ServiceSocketUDP : public SocketUDP {
    public:
     explicit ServiceSocketUDP(const char* ip, uint16_t port);
     ~ServiceSocketUDP();
-    int send(const char* message);
+    int send(const char* message) const;
+    friend ostream& operator<<(ostream& os, const ServiceSocketUDP& socket);
 };
 
 // socket that server reads incoming udp traffic from services, can be binded
